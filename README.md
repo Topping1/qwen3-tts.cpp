@@ -1,35 +1,3 @@
-# Qwen3-tts.cpp fork with saving/loading Speaker Embeddings and interactive mode
-
-you can precompute speaker embeddings (and load them later) to speed up speech generations. You can use an interactive mode to test a voice with many prompts.
-
-```
-Usage: ./build/qwen3-tts-cli [options] -m <model_dir>
-
-Options:
-  -m, --model <dir>      Model directory (required)
-  -t, --text <text>      Text to synthesize (required unless interactive or saving speaker)
-  -i, --interactive      Run in interactive loop mode (load once, generate many)
-  -o, --output <file>    Output WAV file (default: output.wav)
-  -r, --reference <file> Reference audio for voice cloning
-  -s, --speaker <file>   Load precomputed speaker embedding (.spk)
-  --save-speaker <file>  Extract embedding from -r and save to file
-  --temperature <val>    Sampling temperature (default: 0.9, 0=greedy)
-  --top-k <n>            Top-k sampling (default: 50, 0=disabled)
-  --top-p <val>          Top-p sampling (default: 1.0)
-  --max-tokens <n>       Maximum audio tokens (default: 4096)
-  --repetition-penalty <val> Repetition penalty (default: 1.05)
-  -l, --language <lang>  Language: en,ru,zh,ja,ko,de,fr,es (default: en)
-  -j, --threads <n>      Number of threads (default: 4)
-  -h, --help             Show this help
-
-Example:
-  ./build/qwen3-tts-cli -m ./models -t "Hello, world!" -o hello.wav
-  ./build/qwen3-tts-cli -m ./models -i -r reference.wav -o output.wav
-  ./build/qwen3-tts-cli -m ./models -r ref.wav --save-speaker voice.spk
-  ./build/qwen3-tts-cli -m ./models -s voice.spk -t "Hello, world!" -o output.wav
-```
-
-
 # qwen3-tts.cpp
 
 ![PyTorch vs qwen3-tts.cpp benchmark](./docs/benchmark_pytorch_vs_cpp.png)
@@ -102,10 +70,10 @@ python scripts/setup_pipeline_models.py
   -o examples/readme_example_clone.wav
 ```
 
-Expected model artifacts after step 5:
+Expected model artifacts after step 5 depend on the selected quantization. By default:
 
-- `models/qwen3-tts-0.6b-f16.gguf`
-- `models/qwen3-tts-tokenizer-f16.gguf`
+- `models/qwen3-tts-0.6b-q4_k.gguf`
+- `models/qwen3-tts-tokenizer-q8_0.gguf`
 - `models/coreml/code_predictor.mlpackage` (on macOS)
 
 Expected audio outputs after steps 6-7:
@@ -159,8 +127,12 @@ python scripts/setup_pipeline_models.py
 Useful flags:
 
 - `--force` re-downloads and re-generates all artifacts.
+- `--tts-type {f16,f32,q8_0,q4_k}` selects the main TTS model quantization.
+- `--tokenizer-type {f16,f32,q8_0}` selects the tokenizer/vocoder quantization.
 - `--coreml auto|on|off` controls CoreML export behavior.
 - `--skip-download` skips HF download and uses existing local model dirs.
+
+The CLI auto-detects `qwen3-tts-0.6b-*.gguf` and `qwen3-tts-tokenizer-*.gguf` files in `models/`, so you do not need to rename quantized outputs.
 
 ## Manual Model Conversion (Advanced)
 
@@ -190,7 +162,14 @@ Place both `.gguf` files in a `models/` directory.
 # Basic synthesis
 ./build/qwen3-tts-cli -m models -t "Hello, world!" -o hello.wav
 
-# Voice cloning from reference audio
+The setup script can produce different quantization variants (`--tts-type` and `--tokenizer-type`),
+and the CLI will auto-select the "best" file in the models folder.
+Alternatively you can bypass discovery by specifying explicit GGUF filenames:
+
+```
+./build/qwen3-tts-cli -m models --tts-model qwen3-tts-0.6b-q4_k.gguf \
+    --tokenizer-model qwen3-tts-tokenizer-q8_0.gguf -t "Hello" -o out.wav
+```
 ./build/qwen3-tts-cli -m models -t "Hello! How are you?" -r reference.wav -o cloned.wav
 
 # Greedy decoding with max length
